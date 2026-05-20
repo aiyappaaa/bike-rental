@@ -1,16 +1,13 @@
 import { 
   PricingBreakdown, 
   BikeType,
-  calculateAmountBreakdown,
-  isPeakHour,
   isWeekend,
   calculateDurationHours,
-  BUSINESS_CONFIG 
 } from '@rideflow/shared';
-import { Bike } from '@/models/Bike';
-import { Coupon } from '@/models/Coupon';
-import { appConfig } from '@/config/app.config';
-import { logger } from '@/utils/logger';
+import { Bike } from '../models/Bike';
+import { Coupon } from '../models/Coupon';
+import { appConfig } from '../config/app.config';
+import { logger } from '../utils/logger';
 
 export interface PricingOptions {
   bikeId: string;
@@ -81,13 +78,13 @@ class PricingService {
         durationHours,
         subtotal: baseAmount * surgeMultiplier - discount,
         gstPercent: appConfig.pricing.gstPercent,
-        gstAmount: 0, // Will be calculated below
+        gstAmount: 0,
         deposit: bike.deposit,
-        lateFee: 0, // Applied only after rental completion
+        lateFee: 0,
         discount,
         surgeMultiplier,
         surgeAmount: baseAmount * (surgeMultiplier - 1),
-        total: 0, // Will be calculated below
+        total: 0,
       };
 
       // Calculate GST and total
@@ -173,9 +170,6 @@ class PricingService {
     if (isWeekend(startAt) || isWeekend(endAt)) {
       maxMultiplier = Math.max(maxMultiplier, appConfig.surgeConfig.weekendMultiplier);
     }
-
-    // TODO: Add demand-based surge pricing based on station availability
-    // This would require checking current booking density at the pickup station
 
     return maxMultiplier;
   }

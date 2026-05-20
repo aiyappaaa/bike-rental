@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
-import { env } from '@/config/env';
-import { logger } from '@/utils/logger';
+import { getEnv } from '../config/env';
+import { logger } from './logger';
 
 export interface JWTPayload {
   userId: string;
@@ -21,10 +21,10 @@ class JWTService {
   private refreshTokenExpiry: string;
 
   constructor() {
-    this.accessTokenSecret = env.JWT_ACCESS_SECRET;
-    this.refreshTokenSecret = env.JWT_REFRESH_SECRET;
-    this.accessTokenExpiry = env.JWT_ACCESS_EXPIRES_IN;
-    this.refreshTokenExpiry = env.JWT_REFRESH_EXPIRES_IN;
+    this.accessTokenSecret = getEnv('JWT_ACCESS_SECRET', 'dev-access-secret-key');
+    this.refreshTokenSecret = getEnv('JWT_REFRESH_SECRET', 'dev-refresh-secret-key');
+    this.accessTokenExpiry = getEnv('JWT_ACCESS_EXPIRES_IN', '15m');
+    this.refreshTokenExpiry = getEnv('JWT_REFRESH_EXPIRES_IN', '7d');
   }
 
   /**
@@ -39,7 +39,7 @@ class JWTService {
           expiresIn: this.accessTokenExpiry,
           issuer: 'rideflow-bikes',
           audience: 'rideflow-users',
-        }
+        } as jwt.SignOptions
       );
     } catch (error) {
       logger.error('Error generating access token:', error);
@@ -59,7 +59,7 @@ class JWTService {
           expiresIn: this.refreshTokenExpiry,
           issuer: 'rideflow-bikes',
           audience: 'rideflow-users',
-        }
+        } as jwt.SignOptions
       );
     } catch (error) {
       logger.error('Error generating refresh token:', error);

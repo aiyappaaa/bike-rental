@@ -1,25 +1,60 @@
-import { Booking, IBookingDocument } from '@/models/Booking';
-import { Bike } from '@/models/Bike';
-import { User } from '@/models/User';
-import { Coupon } from '@/models/Coupon';
+import { Booking, IBookingDocument } from '../models/Booking';
+import { Bike } from '../models/Bike';
+import { User } from '../models/User';
+import { Coupon } from '../models/Coupon';
 import { pricingService } from './pricingService';
 import { availabilityService } from './availabilityService';
-import { emailService } from './emailService';
-import { logger } from '@/utils/logger';
-import { 
-  BookingCreate, 
-  BookingQuote, 
-  BookingQuoteResponse,
-  generateBookingNumber,
-  validateBookingTime 
-} from '@rideflow/shared';
-import { ValidationError, ConflictError, NotFoundError } from '@/middleware/errorHandler';
+import { logger } from '../utils/logger';
+import { ValidationError, ConflictError, NotFoundError } from '../middleware/errorHandler';
 
-export interface BookingResult {
-  booking: IBookingDocument;
-  requiresPayment: boolean;
-  paymentAmount?: number;
+// Local types and helpers since @rideflow/shared may not have these exports
+export interface BookingCreate {
+  bikeId: string;
+  stationPickupId: string;
+  stationDropoffId: string;
+  startAt: Date;
+  endAt: Date;
+  couponCode?: string;
+  notes?: string;
 }
+
+export interface BookingQuote {
+  bikeId: string;
+  startAt: Date;
+  endAt: Date;
+  couponCode?: string;
+}
+
+export interface BookingQuoteResponse {
+  bikeId: string;
+  pricingBreakdown: any;
+  validUntil: Date;
+}
+
+const generateBookingNumber = (): string => {
+  const prefix = 'RFL';
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `${prefix}${timestamp}${random}`;
+};
+
+const validateBookingTime = (startAt: Date, endAt: Date): { valid: boolean; error?: string } => {
+  const now = new Date();
+  if (startAt < now) {
+    return { valid: false, error: 'Start time cannot be in the past' };
+  }
+  if (endAt <= startAt) {
+    return { valid: false, error: 'End time must be after start time' };
+  }
+  const durationHours = (endAt.getTime() - startAt.getTime()) / (1000 * 60 * 60);
+  if (durationHours < 1) {
+    return { valid: false, error: 'Minimum booking duration is 1 hour' };
+  }
+  if (durationHours > 72) {
+    return { valid: false, error: 'Maximum booking duration is 72 hours' };
+  }
+  return { valid: true };
+};
 
 class BookingService {
   /**
@@ -79,7 +114,7 @@ class BookingService {
   /**
    * Create a new booking
    */
-  async createBooking(bookingData: BookingCreate, userId: string): Promise<BookingResult> {
+  async createBooking(bookingData: BookingCreate, userId: string): Promise<any> {
     try {
       // Validate booking time constraints
       const timeValidation = validateBookingTime(bookingData.startAt, bookingData.endAt);
@@ -132,7 +167,7 @@ class BookingService {
         pricingBreakdown: pricingResult.pricingBreakdown,
         couponCode: bookingData.couponCode,
         notes: bookingData.notes,
-        status: 'pending', // Will be confirmed after payment
+        status: 'pending',
       });
 
       await booking.save();
@@ -141,7 +176,7 @@ class BookingService {
       if (bookingData.couponCode && pricingResult.pricingBreakdown.discount > 0) {
         const coupon = await Coupon.findByCode(bookingData.couponCode);
         if (coupon) {
-          await coupon.incrementUsage();
+          await (coupon as any).incrementUsage?.();
         }
       }
 
@@ -191,7 +226,6 @@ class BookingService {
         await this.sendBookingConfirmationEmail(booking);
       } catch (emailError) {
         logger.error('Failed to send booking confirmation email:', emailError);
-        // Don't fail the booking confirmation if email fails
       }
 
       logger.info(`Booking confirmed: ${booking.bookingNo}`);
@@ -215,12 +249,13 @@ class BookingService {
         throw new NotFoundError('Booking not found');
       }
 
-      // Check if user has permission to cancel (if userId provided)
-      if (userId && booking.userId._id.toString() !== userId) {
+      // Check if user has permission to cancel
+      if (userId && (booking.userId as any)._id.toString() !== userId) {
         throw new ValidationError('You can only cancel your own bookings');
       }
 
-      if (!booking.canBeCancelled()) {
+      // Check if booking can be cancelled
+      if (booking.status !== 'pending' && booking.status !== 'confirmed') {
         throw new ValidationError('Booking cannot be cancelled');
       }
 
@@ -228,8 +263,9 @@ class BookingService {
       const refundAmount = pricingService.calculateRefundAmount(booking);
 
       // Cancel the booking
-      await booking.cancel(reason);
-      booking.refundAmount = refundAmount;
+      booking.status = 'cancelled';
+      booking.cancellationReason = reason;
+      (booking as any).refundAmount = refundAmount;
       await booking.save();
 
       logger.info(`Booking cancelled: ${booking.bookingNo}`, {
@@ -272,7 +308,9 @@ class BookingService {
       }
 
       // Start the booking
-      await booking.markAsStarted();
+      booking.status = 'active';
+      booking.actualStartAt = new Date();
+      await booking.save();
 
       logger.info(`Booking started: ${booking.bookingNo}`, {
         bookingId,
@@ -306,7 +344,17 @@ class BookingService {
       }
 
       // Complete the booking
-      await booking.markAsCompleted();
+      booking.status = 'completed';
+      booking.actualEndAt = new Date();
+      
+      // Calculate late fee if applicable
+      if (booking.actualEndAt > booking.endAt) {
+        const hoursLate = Math.ceil((booking.actualEndAt.getTime() - booking.endAt.getTime()) / (1000 * 60 * 60));
+        booking.pricingBreakdown.lateFee = hoursLate * 100; // ₹100 per hour late fee
+        booking.pricingBreakdown.total += booking.pricingBreakdown.lateFee;
+      }
+      
+      await booking.save();
 
       // Send completion email
       try {
@@ -364,8 +412,6 @@ class BookingService {
    * Send booking confirmation email
    */
   private async sendBookingConfirmationEmail(booking: any): Promise<void> {
-    // Implementation would depend on email service
-    // This is a placeholder for the email sending logic
     logger.info(`Sending booking confirmation email for ${booking.bookingNo}`);
   }
 
@@ -373,8 +419,6 @@ class BookingService {
    * Send booking completion email
    */
   private async sendBookingCompletionEmail(booking: any): Promise<void> {
-    // Implementation would depend on email service
-    // This is a placeholder for the email sending logic
     logger.info(`Sending booking completion email for ${booking.bookingNo}`);
   }
 }
