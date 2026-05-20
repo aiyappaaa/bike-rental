@@ -4,19 +4,18 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Eye, EyeOff, Bike, Mail, Lock, User, Phone } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-// Temporary types to fix import issues
 import { z } from 'zod';
+import { useAuthStore } from '../../store/authStore';
 
+// Matches backend UserRegistrationSchema — single `name` field, phone required
 const UserRegistrationSchema = z.object({
-  firstName: z.string().min(2, 'First name must be at least 2 characters'),
-  lastName: z.string().min(2, 'Last name must be at least 2 characters'),
+  name: z.string().min(2, 'Full name must be at least 2 characters'),
   email: z.string().email('Please enter a valid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  phone: z.string().optional(),
+  phone: z.string().min(1, 'Phone number is required'),
 });
 
 type UserRegistration = z.infer<typeof UserRegistrationSchema>;
-import { useAuthStore } from '../../store/authStore';
 
 const RegisterPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);

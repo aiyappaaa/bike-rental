@@ -31,9 +31,12 @@ export class CustomError extends Error implements AppError {
 }
 
 export class ValidationError extends CustomError {
+  public validationErrors?: Array<{ field: string; message: string }>;
+
   constructor(message: string, errors?: Array<{ field: string; message: string }>) {
     super(message, HTTP_STATUS.BAD_REQUEST, ERROR_CODES.VALIDATION_ERROR);
     this.name = 'ValidationError';
+    this.validationErrors = errors;
   }
 }
 

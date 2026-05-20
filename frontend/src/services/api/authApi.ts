@@ -1,11 +1,13 @@
-// Temporary types to fix import issues
+import { api } from './client';
+
+// User interface matching the backend User model response shape
 interface User {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   phone?: string;
-  isEmailVerified: boolean;
+  role: string;
+  isVerified: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -15,12 +17,12 @@ interface TokenPair {
   refreshToken: string;
 }
 
+// Matches shared UserRegistrationSchema: name (not firstName/lastName), phone required
 interface UserRegistration {
-  firstName: string;
-  lastName: string;
+  name: string;
   email: string;
   password: string;
-  phone?: string;
+  phone: string;
 }
 
 interface UserLogin {
@@ -40,8 +42,6 @@ interface ResetPassword {
 interface EmailVerification {
   token: string;
 }
-
-import { api } from './client';
 
 // Temporary ApiResponse type to fix import issues
 interface ApiResponse<T = any> {

@@ -1,4 +1,5 @@
-// Temporary types to fix import issues
+import { api } from './client';
+
 interface Bike {
   id: string;
   name: string;
@@ -36,8 +37,6 @@ enum BikeType {
   ELECTRIC = 'electric',
   CITY = 'city'
 }
-
-import { api } from './client';
 
 // Temporary ApiResponse type to fix import issues
 interface ApiResponse<T = any> {

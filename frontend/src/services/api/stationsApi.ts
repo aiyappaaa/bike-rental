@@ -1,4 +1,4 @@
-// Temporary types to fix import issues
+import { api } from './client';
 interface Station {
   id: string;
   name: string;
@@ -19,7 +19,7 @@ interface StationQuery {
   limit?: number;
 }
 
-import { api } from './client';
+
 
 // Temporary ApiResponse type to fix import issues
 interface ApiResponse<T = any> {

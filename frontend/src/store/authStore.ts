@@ -2,14 +2,14 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authApi } from '../services/api/authApi';
 
-// Temporary types to fix import issues
+// User interface matching the backend User model response shape
 interface User {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   phone?: string;
-  isEmailVerified: boolean;
+  role: string;
+  isVerified: boolean;
   createdAt: string;
   updatedAt: string;
 }
